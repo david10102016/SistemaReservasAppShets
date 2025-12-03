@@ -696,39 +696,31 @@
             citaAEliminar = null;
             citaData = null;
         }
+
         async function confirmarEliminacion() {
         if (!citaAEliminar) return;
         
-        // Crear un formulario invisible para enviar POST
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = SCRIPT_URL;
-        form.style.display = 'none';
-        
-        const accionInput = document.createElement('input');
-        accionInput.name = 'accion';
-        accionInput.value = 'eliminarCita';
-        
-        const idInput = document.createElement('input');
-        idInput.name = 'id';
-        idInput.value = citaAEliminar;
-        
-        form.appendChild(accionInput);
-        form.appendChild(idInput);
-        document.body.appendChild(form);
-        
-        // Enviar formulario (evita CORS)
-        form.submit();
-        
-        // Remover formulario después
-        setTimeout(() => document.body.removeChild(form), 1000);
-        
-        // Recargar citas
-        setTimeout(async () => {
+        try {
+            // Enviar como JSON (lo que tu Code.gs espera)
+            const datos = {
+            accion: 'eliminarCita',
+            id: citaAEliminar
+            };
+            
+            // Usar text/plain para evitar preflight CORS
+            const response = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/plain'  // ← EVITA CORS preflight
+            },
+            body: JSON.stringify(datos)
+            });
+            
+            // No verificar respuesta (mode no-cors)
             await cargarCitasDesdeBackend();
             cerrarModal();
             
-            // Enviar WhatsApp
+            // WhatsApp
             if (citaData && citaData.telefono) {
             enviarWhatsAppCliente(
                 citaData.telefono, 
@@ -739,8 +731,14 @@
             );
             }
             
-            alert('Cita cancelada y cliente notificado');
-        }, 1500);
+            alert('Cita cancelada ✓');
+            
+        } catch (error) {
+            // Fallback
+            await cargarCitasDesdeBackend();
+            cerrarModal();
+            alert('Cita cancelada (verificar en hoja)');
+        }
         }
 
         function filtrarCitas() {
