@@ -449,6 +449,7 @@
         
         const EMAILS_AUTORIZADOS = [
             'creativo777si@gmail.com',
+            'lucinda.lupati777@gmail.com',
             'empleado@gmail.com'
         ];
 
@@ -487,12 +488,17 @@
         }
 
         function parseJwt(token) {
-            const base64Url = token.split('.')[1];
-            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-            const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
-                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-            }).join(''));
-            return JSON.parse(jsonPayload);
+            try {
+                const base64Url = token.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                return JSON.parse(jsonPayload);
+            } catch (error) {
+                console.error('Error parsing JWT:', error);
+                return { email: '' };
+            }
         }
 
         async function mostrarDashboard() {
@@ -521,6 +527,8 @@
                     citas = result.citas;
                     cargarCitas();
                     actualizarEstadisticas();
+                } else {
+                    document.getElementById('noData').style.display = 'block';
                 }
             } catch (error) {
                 console.error('Error cargando citas:', error);
@@ -536,12 +544,14 @@
                 const selectBarbero = document.getElementById('filterBarbero');
                 selectBarbero.innerHTML = '<option value="">Todos</option>';
                 
-                barberos.forEach(b => {
-                    const option = document.createElement('option');
-                    option.value = b.nombre;
-                    option.textContent = b.nombre;
-                    selectBarbero.appendChild(option);
-                });
+                if (barberos && barberos.length > 0) {
+                    barberos.forEach(b => {
+                        const option = document.createElement('option');
+                        option.value = b.nombre || b;
+                        option.textContent = b.nombre || b;
+                        selectBarbero.appendChild(option);
+                    });
+                }
             } catch (error) {
                 console.error('Error cargando barberos:', error);
             }
@@ -551,7 +561,7 @@
             const tbody = document.getElementById('appointmentsBody');
             const citasAMostrar = citasFiltradas || citas;
             
-            if (citasAMostrar.length === 0) {
+            if (!citasAMostrar || citasAMostrar.length === 0) {
                 tbody.innerHTML = '';
                 document.getElementById('noData').style.display = 'block';
                 return;
@@ -562,18 +572,18 @@
             tbody.innerHTML = citasAMostrar.map(cita => `
                 <tr>
                     <td>${formatearFecha(cita.fecha)}</td>
-                    <td><strong>${cita.hora}</strong></td>
-                    <td>${cita.nombre}</td>
-                    <td>${cita.telefono}</td>
-                    <td>${cita.servicio}</td>
-                    <td>${cita.barbero}</td>
-                    <td><span class="status ${cita.estado}">${cita.estado}</span></td>
+                    <td><strong>${formatearHora(cita.hora)}</strong></td>
+                    <td>${cita.nombre || ''}</td>
+                    <td>${cita.telefono || ''}</td>
+                    <td>${cita.servicio || ''}</td>
+                    <td>${cita.barbero || ''}</td>
+                    <td><span class="status ${cita.estado || 'Confirmada'}">${cita.estado || 'Confirmada'}</span></td>
                     <td>
                         <div class="actions">
-                            <button class="btn-action btn-whatsapp" onclick="abrirWhatsApp('${cita.telefono}', '${cita.nombre}', '${cita.fecha}', '${cita.hora}')">
+                            <button class="btn-action btn-whatsapp" onclick="abrirWhatsApp('${cita.telefono || ''}', '${cita.nombre || ''}', '${cita.fecha || ''}', '${cita.hora || ''}')">
                                 💬 WhatsApp
                             </button>
-                            <button class="btn-action btn-delete" onclick="abrirModalEliminar(${cita.id}, '${cita.nombre}', '${cita.fecha}')">
+                            <button class="btn-action btn-delete" onclick="abrirModalEliminar(${cita.id || 0}, '${cita.nombre || ''}', '${cita.fecha || ''}')">
                                 🗑️
                             </button>
                         </div>
@@ -583,25 +593,73 @@
         }
 
         function formatearFecha(fecha) {
-            const f = new Date(fecha + 'T00:00:00');
-            return f.toLocaleDateString('es-BO', { 
-                weekday: 'short', 
-                day: 'numeric', 
-                month: 'short' 
-            });
+            if (!fecha) return '';
+            
+            try {
+                let fechaObj;
+                
+                if (fecha instanceof Date) {
+                    fechaObj = fecha;
+                } else if (typeof fecha === 'string' && fecha.includes('T')) {
+                    fechaObj = new Date(fecha);
+                } else if (typeof fecha === 'string' && fecha.includes('-')) {
+                    fechaObj = new Date(fecha + 'T00:00:00');
+                } else {
+                    fechaObj = new Date(fecha);
+                }
+                
+                if (isNaN(fechaObj.getTime())) {
+                    return fecha;
+                }
+                
+                return fechaObj.toLocaleDateString('es-BO', {
+                    weekday: 'short',
+                    day: 'numeric',
+                    month: 'short'
+                });
+                
+            } catch (error) {
+                console.error('Error formateando fecha:', fecha, error);
+                return String(fecha);
+            }
+        }
+
+        function formatearHora(hora) {
+            if (!hora) return '';
+            
+            if (hora.includes('T') && hora.includes('Z')) {
+                try {
+                    const fecha = new Date(hora);
+                    return fecha.toLocaleTimeString('es-BO', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                    });
+                } catch (e) {
+                    return hora;
+                }
+            }
+            
+            return hora;
         }
 
         function abrirWhatsApp(telefono, nombre, fecha, hora) {
+            if (!telefono) {
+                alert('No hay teléfono registrado para este cliente');
+                return;
+            }
+            
             const numeroLimpio = telefono.replace(/\D/g, '');
-            const mensaje = `Hola ${nombre}, te confirmamos tu cita para el ${formatearFecha(fecha)} a las ${hora}. ¡Te esperamos! 💈`;
+            const fechaFormateada = formatearFecha(fecha);
+            const mensaje = `Hola ${nombre || 'cliente'}, te confirmamos tu cita para el ${fechaFormateada} a las ${formatearHora(hora)}. ¡Te esperamos! 💈`;
             const url = `https://wa.me/591${numeroLimpio}?text=${encodeURIComponent(mensaje)}`;
             window.open(url, '_blank');
         }
 
         function abrirModalEliminar(id, nombre, fecha) {
             citaAEliminar = id;
-            document.getElementById('deleteClientName').textContent = nombre;
-            document.getElementById('deleteClientDate').textContent = formatearFecha(fecha);
+            document.getElementById('deleteClientName').textContent = nombre || 'Cliente';
+            document.getElementById('deleteClientDate').textContent = formatearFecha(fecha) || fecha;
             document.getElementById('deleteModal').classList.add('show');
         }
 
@@ -611,24 +669,30 @@
         }
 
         async function confirmarEliminacion() {
-            if (citaAEliminar) {
-                try {
-                    await fetch(SCRIPT_URL, {
-                        method: 'POST',
-                        mode: 'no-cors',
-                        body: JSON.stringify({
-                            accion: 'eliminarCita',
-                            id: citaAEliminar
-                        })
-                    });
-                    
+            if (!citaAEliminar) return;
+            
+            try {
+                const response = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        accion: 'eliminarCita',
+                        id: citaAEliminar
+                    })
+                });
+                
+                if (response.ok) {
                     await cargarCitasDesdeBackend();
                     cerrarModal();
                     alert('Cita cancelada exitosamente');
-                } catch (error) {
-                    alert('Error al cancelar la cita');
-                    console.error(error);
+                } else {
+                    throw new Error('Error en la respuesta');
                 }
+            } catch (error) {
+                alert('Error al cancelar la cita');
+                console.error(error);
             }
         }
 
@@ -660,6 +724,14 @@
         }
 
         function actualizarEstadisticas() {
+            if (!citas || citas.length === 0) {
+                document.getElementById('citasHoy').textContent = 0;
+                document.getElementById('citasSemana').textContent = 0;
+                document.getElementById('citasMes').textContent = 0;
+                document.getElementById('ingresosMes').textContent = 'Bs 0';
+                return;
+            }
+
             const hoy = new Date().toISOString().split('T')[0];
             const inicioSemana = new Date();
             inicioSemana.setDate(inicioSemana.getDate() - inicioSemana.getDay());
@@ -667,16 +739,22 @@
             inicioMes.setDate(1);
 
             const citasHoy = citas.filter(c => c.fecha === hoy).length;
-            const citasSemana = citas.filter(c => new Date(c.fecha + 'T00:00:00') >= inicioSemana).length;
+            const citasSemana = citas.filter(c => {
+                const fechaCita = new Date(c.fecha + 'T00:00:00');
+                return fechaCita >= inicioSemana;
+            }).length;
+            
             const citasMes = citas.filter(c => {
                 const fechaCita = new Date(c.fecha + 'T00:00:00');
-                return fechaCita.getMonth() === inicioMes.getMonth();
+                return fechaCita.getMonth() === inicioMes.getMonth() && 
+                       fechaCita.getFullYear() === inicioMes.getFullYear();
             }).length;
 
             const ingresosMes = citas
                 .filter(c => {
                     const fechaCita = new Date(c.fecha + 'T00:00:00');
-                    return fechaCita.getMonth() === inicioMes.getMonth();
+                    return fechaCita.getMonth() === inicioMes.getMonth() && 
+                           fechaCita.getFullYear() === inicioMes.getFullYear();
                 })
                 .reduce((total, c) => total + (c.precio || 0), 0);
 
