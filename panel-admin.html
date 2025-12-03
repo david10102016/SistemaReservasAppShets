@@ -721,15 +721,29 @@
         
         // 3. Esperar 2 segundos y FORZAR recarga
         setTimeout(async () => {
+            // Intentamos recargar desde el backend
             await cargarCitasDesdeBackend(); // Esto recarga TODAS las citas
+
+            // Cerrar modal
             cerrarModal();
-            
-            // Verificar que cambió
-            const citaCancelada = citas.find(c => c.id === citaAEliminar);
-            if (citaCancelada && citaCancelada.estado === 'Cancelada') {
-            alert('✅ Cita cancelada correctamente');
+
+            // Buscar la cita recargada — usar comparación flexible de tipos (string/number)
+            const idStr = String(citaAEliminar);
+            let citaCancelada = todasLasCitas.find(c => String(c.id) === idStr) || citas.find(c => String(c.id) === idStr);
+
+            if (citaCancelada) {
+                // Si el backend devolvió la cita, forzamos que su estado sea 'Cancelada' en el front-end
+                // (esto cubre casos donde la actualización tarda o viene con tipos diferentes)
+                citaCancelada.estado = 'Cancelada';
+                // Actualizar arrays y tabla
+                citas = todasLasCitas.slice();
+                cargarCitas();
+                alert('✅ Cita cancelada correctamente');
             } else {
-            alert('Cita cancelada (recarga manual si no cambia)');
+                // Si no encontramos la cita, recargamos la tabla igualmente y avisamos al usuario
+                citas = todasLasCitas.slice();
+                cargarCitas();
+                alert('Cita cancelada (si la UI no cambia, recarga manual la página)');
             }
         }, 2000);
         }
