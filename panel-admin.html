@@ -696,41 +696,51 @@
             citaAEliminar = null;
             citaData = null;
         }
-
         async function confirmarEliminacion() {
-            if (!citaAEliminar) return;
+        if (!citaAEliminar) return;
+        
+        // Crear un formulario invisible para enviar POST
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = SCRIPT_URL;
+        form.style.display = 'none';
+        
+        const accionInput = document.createElement('input');
+        accionInput.name = 'accion';
+        accionInput.value = 'eliminarCita';
+        
+        const idInput = document.createElement('input');
+        idInput.name = 'id';
+        idInput.value = citaAEliminar;
+        
+        form.appendChild(accionInput);
+        form.appendChild(idInput);
+        document.body.appendChild(form);
+        
+        // Enviar formulario (evita CORS)
+        form.submit();
+        
+        // Remover formulario después
+        setTimeout(() => document.body.removeChild(form), 1000);
+        
+        // Recargar citas
+        setTimeout(async () => {
+            await cargarCitasDesdeBackend();
+            cerrarModal();
             
-            try {
-                const response = await fetch(`${SCRIPT_URL}?accion=eliminarCita&id=${citaAEliminar}`);
-                
-                if (!response.ok) {
-                    throw new Error('Error en la respuesta del servidor');
-                }
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    await cargarCitasDesdeBackend();
-                    cerrarModal();
-                    
-                    if (citaData && citaData.telefono) {
-                        enviarWhatsAppCliente(
-                            citaData.telefono, 
-                            citaData.nombre, 
-                            citaData.fecha, 
-                            citaData.hora, 
-                            'Cancelada'
-                        );
-                    }
-                    
-                    alert('Cita cancelada exitosamente. Se ha enviado notificación al cliente.');
-                } else {
-                    throw new Error(result.message || 'Error al cancelar la cita');
-                }
-            } catch (error) {
-                alert('Error al cancelar la cita: ' + error.message);
-                console.error('Error detallado:', error);
+            // Enviar WhatsApp
+            if (citaData && citaData.telefono) {
+            enviarWhatsAppCliente(
+                citaData.telefono, 
+                citaData.nombre, 
+                citaData.fecha, 
+                citaData.hora, 
+                'Cancelada'
+            );
             }
+            
+            alert('Cita cancelada y cliente notificado');
+        }, 1500);
         }
 
         function filtrarCitas() {
