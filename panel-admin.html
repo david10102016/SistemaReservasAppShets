@@ -533,21 +533,31 @@
 
         async function cargarCitasDesdeBackend() {
             try {
-                const response = await fetch(SCRIPT_URL + '?accion=obtenerCitas');
-                const result = await response.json();
-                
-                if (result.success && result.citas) {
+                // Usar la función reutilizable obtenerCitas para facilitar polling
+                const result = await obtenerCitas();
+
+                if (result && result.success && result.citas) {
                     todasLasCitas = result.citas;
                     citas = result.citas;
                     cargarCitas();
                     actualizarEstadisticas();
+                    return result;
                 } else {
                     document.getElementById('noData').style.display = 'block';
+                    return result;
                 }
             } catch (error) {
                 console.error('Error cargando citas:', error);
                 document.getElementById('noData').style.display = 'block';
             }
+        }
+
+        // Función reutilizable que obtiene las citas del backend y devuelve el JSON.
+        // Se usa tanto en la carga inicial como en el polling después de eliminar.
+        async function obtenerCitas() {
+            const response = await fetch(SCRIPT_URL + '?accion=obtenerCitas');
+            const result = await response.json();
+            return result;
         }
 
         async function cargarBarberosEnFiltro() {
@@ -719,33 +729,56 @@
             // Ignorar
         }
         
-        // 3. Esperar 2 segundos y FORZAR recarga
-        setTimeout(async () => {
-            // Intentamos recargar desde el backend
-            await cargarCitasDesdeBackend(); // Esto recarga TODAS las citas
+        // 3. Polling: esperar hasta que el backend marque la cita como 'Cancelada'
+        // Hacemos varios intentos (intervalo) y timeout total antes de caer al fallback.
+        (async function pollCancelacion() {
+            const maxAttempts = 8; // número de reintentos
+            const intervalMs = 1500; // tiempo entre intentos
+            let attempt = 0;
+            let encontrado = false;
 
-            // Cerrar modal
-            cerrarModal();
+            while (attempt < maxAttempts && !encontrado) {
+                try {
+                    // Esperar antes del primer intento para dar tiempo al backend
+                    if (attempt > 0) await new Promise(r => setTimeout(r, intervalMs));
 
-            // Buscar la cita recargada — usar comparación flexible de tipos (string/number)
-            const idStr = String(citaAEliminar);
-            let citaCancelada = todasLasCitas.find(c => String(c.id) === idStr) || citas.find(c => String(c.id) === idStr);
-
-            if (citaCancelada) {
-                // Si el backend devolvió la cita, forzamos que su estado sea 'Cancelada' en el front-end
-                // (esto cubre casos donde la actualización tarda o viene con tipos diferentes)
-                citaCancelada.estado = 'Cancelada';
-                // Actualizar arrays y tabla
-                citas = todasLasCitas.slice();
-                cargarCitas();
-                alert('✅ Cita cancelada correctamente');
-            } else {
-                // Si no encontramos la cita, recargamos la tabla igualmente y avisamos al usuario
-                citas = todasLasCitas.slice();
-                cargarCitas();
-                alert('Cita cancelada (si la UI no cambia, recarga manual la página)');
+                    const result = await obtenerCitas();
+                    if (result && result.success && result.citas) {
+                        todasLasCitas = result.citas;
+                        citas = todasLasCitas.slice();
+                        // Buscar por id flexible
+                        const idStr = String(citaAEliminar);
+                        const c = todasLasCitas.find(x => String(x.id) === idStr);
+                        if (c && String(c.estado).toLowerCase() === 'cancelada') {
+                            encontrado = true;
+                            // Asegurar estado correcto en front
+                            c.estado = 'Cancelada';
+                            cargarCitas();
+                            actualizarEstadisticas();
+                            cerrarModal();
+                            alert('✅ Cita cancelada correctamente');
+                            break;
+                        }
+                    }
+                } catch (err) {
+                    console.warn('Error durante polling de cancelación:', err);
+                }
+                attempt++;
             }
-        }, 2000);
+
+            if (!encontrado) {
+                // Fallback: forzar estado local y actualizar UI para no dejar al usuario confundido
+                const idStr = String(citaAEliminar);
+                let citaLocal = todasLasCitas.find(c => String(c.id) === idStr) || citas.find(c => String(c.id) === idStr);
+                if (citaLocal) {
+                    citaLocal.estado = 'Cancelada';
+                }
+                citas = todasLasCitas.slice();
+                cargarCitas();
+                cerrarModal();
+                alert('Cita cancelada (si la UI no cambia, recarga manualmente la página).');
+            }
+        })();
         }
 
         function filtrarCitas() {
