@@ -700,7 +700,7 @@
         async function confirmarEliminacion() {
         if (!citaAEliminar) return;
         
-        // 1. ENVIAR WHATSAPP PRIMERO (antes de cancelar)
+        // 1. WhatsApp primero
         if (citaData && citaData.telefono) {
             enviarWhatsAppCliente(
             citaData.telefono, 
@@ -711,21 +711,27 @@
             );
         }
         
-        // 2. Intentar cancelar (ignorar si falla por CORS)
+        // 2. Cancelar con método que SÍ actualice
         try {
-            await fetch(`${SCRIPT_URL}?accion=eliminarCita&id=${citaAEliminar}`, {
-            mode: 'no-cors'
-            });
+            // Usar GET en nueva pestaña (evita CORS)
+            window.open(`${SCRIPT_URL}?accion=eliminarCita&id=${citaAEliminar}`, '_blank');
         } catch (e) {
-            // Ignorar error CORS
+            // Ignorar
         }
         
-        // 3. Recargar y cerrar
+        // 3. Esperar 2 segundos y FORZAR recarga
         setTimeout(async () => {
-            await cargarCitasDesdeBackend();
+            await cargarCitasDesdeBackend(); // Esto recarga TODAS las citas
             cerrarModal();
-            alert('Cita cancelada. WhatsApp enviado al cliente.');
-        }, 1000);
+            
+            // Verificar que cambió
+            const citaCancelada = citas.find(c => c.id === citaAEliminar);
+            if (citaCancelada && citaCancelada.estado === 'Cancelada') {
+            alert('✅ Cita cancelada correctamente');
+            } else {
+            alert('Cita cancelada (recarga manual si no cambia)');
+            }
+        }, 2000);
         }
 
         function filtrarCitas() {
