@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reserva tu Cita - Salón de Belleza/Barbería</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 15px;
+            transition: all 0.3s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        small {
+            display: block;
+            margin-top: 5px;
+            color: #666;
+            font-size: 12px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .confirmation {
+            display: none;
+            background: #f0f9ff;
+            border: 2px solid #0ea5e9;
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 20px;
+        }
+
+        .confirmation.show {
+            display: block;
+            animation: slideIn 0.5s;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .confirmation h2 {
+            color: #0ea5e9;
+            margin-bottom: 15px;
+            font-size: 22px;
+        }
+
+        .confirmation-detail {
+            margin: 10px 0;
+            color: #333;
+            font-size: 15px;
+        }
+
+        .confirmation-detail strong {
+            color: #0ea5e9;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            color: #667eea;
+            margin-top: 15px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .error {
+            background: #fee;
+            border: 2px solid #f66;
+            color: #c33;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+
+        .btn-secondary {
+            background: #6b7280;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💇 Salón de Belleza/Barbería</h1>
+        <p class="subtitle">Santa Cruz, Bolivia</p>
+
+        <form id="bookingForm">
+            <div class="form-group">
+                <label for="nombre">Nombre completo *</label>
+                <input type="text" id="nombre" required placeholder="Ej: Juan Pérez">
+            </div>
+
+            <div class="form-group">
+                <label for="telefono">Teléfono/WhatsApp *</label>
+                <input type="tel" id="telefono" required placeholder="Ej: 77123456">
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email (opcional)</label>
+                <input type="email" id="email" placeholder="tu@email.com">
+                <small>Para recibir confirmación por correo electrónico</small>
+            </div>
+
+            <div class="form-group">
+                <label for="servicio">Servicio *</label>
+                <select id="servicio" required>
+                    <option value="">Selecciona un servicio</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="barbero">Barbero/Estilista *</label>
+                <select id="barbero" required>
+                    <option value="">Selecciona un profesional</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="fecha">Fecha *</label>
+                <input type="date" id="fecha" required>
+            </div>
+
+            <div class="form-group">
+                <label for="hora">Hora *</label>
+                <select id="hora" required>
+                    <option value="">Primero selecciona fecha y servicio</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn">Reservar Cita</button>
+        </form>
+
+        <div class="loading" id="loading">
+            ⏳ Procesando tu reserva...
+        </div>
+
+        <div class="error" id="error"></div>
+
+        <div class="confirmation" id="confirmation">
+            <h2>✅ ¡Cita Confirmada!</h2>
+            <div class="confirmation-detail"><strong>Nombre:</strong> <span id="confNombre"></span></div>
+            <div class="confirmation-detail"><strong>Teléfono:</strong> <span id="confTelefono"></span></div>
+            <div class="confirmation-detail"><strong>Servicio:</strong> <span id="confServicio"></span></div>
+            <div class="confirmation-detail"><strong>Profesional:</strong> <span id="confBarbero"></span></div>
+            <div class="confirmation-detail"><strong>Fecha:</strong> <span id="confFecha"></span></div>
+            <div class="confirmation-detail"><strong>Hora:</strong> <span id="confHora"></span></div>
+            
+            <p style="margin-top: 20px; color: #666; font-size: 14px;">
+                📱 Guarda esta información o toma captura de pantalla
+            </p>
+            <p style="margin-top: 10px; color: #666; font-size: 14px;">
+                📧 Si proporcionaste tu email, recibirás una confirmación por correo
+            </p>
+
+            <button class="btn btn-secondary" onclick="location.reload()">Hacer otra reserva</button>
+        </div>
+    </div>
+
+    <script>
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzbfQtjvwzXXr-TKyF-CdXv1nTKOeCMEsWbOscJcZ49it3jqlKp9lLCapeUHaWbG-Wx/exec';
+
+        let servicios = [];
+        let barberos = [];
+
+        window.onload = async function() {
+            try {
+                const respServicios = await fetch(SCRIPT_URL + '?accion=obtenerServicios');
+                servicios = await respServicios.json();
+                
+                const selectServicio = document.getElementById('servicio');
+                servicios.forEach(s => {
+                    const option = document.createElement('option');
+                    option.value = s.nombre;
+                    option.textContent = `${s.nombre} (${s.duracion} min - Bs ${s.precio})`;
+                    option.dataset.duracion = s.duracion;
+                    selectServicio.appendChild(option);
+                });
+
+                const respBarberos = await fetch(SCRIPT_URL + '?accion=obtenerBarberos');
+                barberos = await respBarberos.json();
+                
+                const selectBarbero = document.getElementById('barbero');
+                barberos.forEach(b => {
+                    const option = document.createElement('option');
+                    option.value = b.nombre;
+                    option.textContent = `${b.nombre} - ${b.especialidad}`;
+                    selectBarbero.appendChild(option);
+                });
+
+            } catch(error) {
+                console.error('Error cargando datos:', error);
+                servicios = [
+                    { nombre: 'Corte de cabello caballero', duracion: 30, precio: 50 },
+                    { nombre: 'Corte de cabello dama', duracion: 45, precio: 70 },
+                    { nombre: 'Barba y perfilado', duracion: 20, precio: 30 }
+                ];
+                
+                const selectServicio = document.getElementById('servicio');
+                servicios.forEach(s => {
+                    const option = document.createElement('option');
+                    option.value = s.nombre;
+                    option.textContent = `${s.nombre} (${s.duracion} min - Bs ${s.precio})`;
+                    option.dataset.duracion = s.duracion;
+                    selectServicio.appendChild(option);
+                });
+
+                barberos = ['Carlos', 'María', 'José'];
+                const selectBarbero = document.getElementById('barbero');
+                barberos.forEach(b => {
+                    const option = document.createElement('option');
+                    option.value = b;
+                    option.textContent = b;
+                    selectBarbero.appendChild(option);
+                });
+            }
+
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('fecha').min = today;
+        };
+
+        document.getElementById('fecha').addEventListener('change', generarHorarios);
+        document.getElementById('servicio').addEventListener('change', generarHorarios);
+
+        function generarHorarios() {
+            const selectHora = document.getElementById('hora');
+            const fecha = document.getElementById('fecha').value;
+            const servicio = document.getElementById('servicio').selectedOptions[0];
+
+            if (!fecha || !servicio || !servicio.dataset.duracion) {
+                selectHora.innerHTML = '<option value="">Primero selecciona fecha y servicio</option>';
+                return;
+            }
+
+            selectHora.innerHTML = '<option value="">Selecciona una hora</option>';
+            
+            for (let h = 9; h < 19; h++) {
+                for (let m = 0; m < 60; m += 30) {
+                    const hora = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                    const option = document.createElement('option');
+                    option.value = hora;
+                    option.textContent = hora;
+                    selectHora.appendChild(option);
+                }
+            }
+        }
+
+        document.getElementById('bookingForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const datos = {
+                accion: 'crearCita',
+                nombre: document.getElementById('nombre').value,
+                telefono: document.getElementById('telefono').value,
+                email: document.getElementById('email').value || '',
+                servicio: document.getElementById('servicio').value,
+                barbero: document.getElementById('barbero').value,
+                fecha: document.getElementById('fecha').value,
+                hora: document.getElementById('hora').value
+            };
+
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('error').classList.remove('show');
+
+            try {
+                const response = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(datos)
+                });
+                
+                document.getElementById('loading').classList.remove('show');
+                mostrarConfirmacion(datos);
+                
+            } catch (error) {
+                document.getElementById('loading').classList.remove('show');
+                mostrarError('Error al procesar la reserva. Intenta nuevamente.');
+                console.error('Error:', error);
+            }
+        });
+
+        function mostrarConfirmacion(datos) {
+            document.getElementById('confNombre').textContent = datos.nombre;
+            document.getElementById('confTelefono').textContent = datos.telefono;
+            document.getElementById('confServicio').textContent = datos.servicio;
+            document.getElementById('confBarbero').textContent = datos.barbero;
+            document.getElementById('confFecha').textContent = new Date(datos.fecha + 'T00:00:00').toLocaleDateString('es-BO', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+            document.getElementById('confHora').textContent = datos.hora;
+            
+            document.getElementById('bookingForm').style.display = 'none';
+            document.getElementById('confirmation').classList.add('show');
+        }
+
+        function mostrarError(mensaje) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = mensaje;
+            errorDiv.classList.add('show');
+            document.getElementById('loading').classList.remove('show');
+        }
+    </script>
+</body>
+</html>
