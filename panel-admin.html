@@ -543,6 +543,10 @@
                     actualizarEstadisticas();
                     return result;
                 } else {
+                    // Si el backend devolvió éxito=false con un mensaje, mostrarlo para que el admin vea la causa
+                    if (result && result.success === false && result.message) {
+                        alert('Respuesta del servidor: ' + result.message);
+                    }
                     document.getElementById('noData').style.display = 'block';
                     return result;
                 }
@@ -555,9 +559,14 @@
         // Función reutilizable que obtiene las citas del backend y devuelve el JSON.
         // Se usa tanto en la carga inicial como en el polling después de eliminar.
         async function obtenerCitas() {
-            const response = await fetch(SCRIPT_URL + '?accion=obtenerCitas');
-            const result = await response.json();
-            return result;
+            try {
+                const response = await fetch(SCRIPT_URL + '?accion=obtenerCitas');
+                const result = await response.json();
+                return result;
+            } catch (err) {
+                console.warn('obtenerCitas error:', err);
+                return { success: false, message: 'Error al conectar con backend: ' + (err && err.message ? err.message : String(err)) };
+            }
         }
 
         async function cargarBarberosEnFiltro() {
@@ -708,81 +717,94 @@
         }
 
         async function confirmarEliminacion() {
-        if (!citaAEliminar) return;
-        
-        // Nota: ya no enviamos WhatsApp aquí (evita duplicados). Se enviará
-        // únicamente cuando el backend confirme la cancelación.
-        
-        // 2. Cancelar con método que SÍ actualice
-        try {
-            // Usar GET en nueva pestaña (evita CORS)
-            window.open(`${SCRIPT_URL}?accion=eliminarCita&id=${citaAEliminar}`, '_blank');
-        } catch (e) {
-            // Ignorar
-        }
-        
-        // 3. Polling: esperar hasta que el backend marque la cita como 'Cancelada'
-        // Hacemos varios intentos (intervalo) y timeout total antes de caer al fallback.
-        (async function pollCancelacion() {
-            const maxAttempts = 8; // número de reintentos
-            const intervalMs = 1500; // tiempo entre intentos
-            let attempt = 0;
-            let encontrado = false;
+            if (!citaAEliminar) return;
 
-            while (attempt < maxAttempts && !encontrado) {
-                try {
-                    // Esperar antes del primer intento para dar tiempo al backend
-                    if (attempt > 0) await new Promise(r => setTimeout(r, intervalMs));
+            // Nota: ya no enviamos WhatsApp aquí (evita duplicados). Se enviará
+            // únicamente cuando el backend confirme la cancelación.
 
-                    const result = await obtenerCitas();
-                    if (result && result.success && result.citas) {
-                        todasLasCitas = result.citas;
-                        citas = todasLasCitas.slice();
-                        // Buscar por id flexible
-                        const idStr = String(citaAEliminar);
-                        const c = todasLasCitas.find(x => String(x.id) === idStr);
-                        if (c && String(c.estado).toLowerCase() === 'cancelada') {
-                            encontrado = true;
-                            // Asegurar estado correcto en front
-                            c.estado = 'Cancelada';
-                            // Enviar WhatsApp sólo después de confirmar que el backend marcó la cita como cancelada
-                            try {
-                                const tel = c.telefono || (citaData && citaData.telefono);
-                                const nombre = c.nombre || (citaData && citaData.nombre);
-                                const fecha = c.fecha || (citaData && citaData.fecha);
-                                const hora = c.hora || (citaData && citaData.hora);
-                                if (tel) {
-                                    enviarWhatsAppCliente(tel, nombre, fecha, hora, 'Cancelada');
-                                }
-                            } catch (e) {
-                                console.warn('No se pudo enviar WhatsApp tras confirmación:', e);
+            // Construir la URL de eliminación y abrirla en nueva pestaña (workaround CORS)
+            const deletionUrl = `${SCRIPT_URL}?accion=eliminarCita&id=${citaAEliminar}`;
+            try {
+                window.open(deletionUrl, '_blank');
+            } catch (e) {
+                // Ignorar
+            }
+
+            // Polling: esperar hasta que el backend marque la cita como 'Cancelada'
+            (async function pollCancelacion() {
+                const maxAttempts = 8; // número de reintentos
+                const intervalMs = 1500; // tiempo entre intentos
+                let attempt = 0;
+                let encontrado = false;
+
+                while (attempt < maxAttempts && !encontrado) {
+                    try {
+                        if (attempt > 0) await new Promise(r => setTimeout(r, intervalMs));
+
+                        const result = await obtenerCitas();
+
+                        // Si obtenerCitas retornó un error del servidor, mostrar el mensaje y ofrecer abrir la URL
+                        if (result && result.success === false && result.message) {
+                            alert('Respuesta del servidor: ' + result.message);
+                            if (confirm('¿Deseas abrir la URL de eliminación para ver la respuesta del servidor y reintentar?')) {
+                                window.open(deletionUrl, '_blank');
                             }
-                            cargarCitas();
-                            actualizarEstadisticas();
-                            cerrarModal();
-                            alert('✅ Cita cancelada correctamente');
                             break;
                         }
-                    }
-                } catch (err) {
-                    console.warn('Error durante polling de cancelación:', err);
-                }
-                attempt++;
-            }
 
-            if (!encontrado) {
-                // Fallback: forzar estado local y actualizar UI para no dejar al usuario confundido
-                const idStr = String(citaAEliminar);
-                let citaLocal = todasLasCitas.find(c => String(c.id) === idStr) || citas.find(c => String(c.id) === idStr);
-                if (citaLocal) {
-                    citaLocal.estado = 'Cancelada';
+                        if (result && result.success && result.citas) {
+                            todasLasCitas = result.citas;
+                            citas = todasLasCitas.slice();
+                            // Buscar por id flexible
+                            const idStr = String(citaAEliminar);
+                            const c = todasLasCitas.find(x => String(x.id) === idStr);
+                            if (c && String(c.estado).toLowerCase() === 'cancelada') {
+                                encontrado = true;
+                                // Asegurar estado correcto en front
+                                c.estado = 'Cancelada';
+                                // Enviar WhatsApp sólo después de confirmar que el backend marcó la cita como cancelada
+                                try {
+                                    const tel = c.telefono || (citaData && citaData.telefono);
+                                    const nombre = c.nombre || (citaData && citaData.nombre);
+                                    const fecha = c.fecha || (citaData && citaData.fecha);
+                                    const hora = c.hora || (citaData && citaData.hora);
+                                    if (tel) {
+                                        enviarWhatsAppCliente(tel, nombre, fecha, hora, 'Cancelada');
+                                    }
+                                } catch (e) {
+                                    console.warn('No se pudo enviar WhatsApp tras confirmación:', e);
+                                }
+                                cargarCitas();
+                                actualizarEstadisticas();
+                                cerrarModal();
+                                alert('✅ Cita cancelada correctamente');
+                                break;
+                            }
+                        }
+                    } catch (err) {
+                        console.warn('Error durante polling de cancelación:', err);
+                    }
+                    attempt++;
                 }
-                citas = todasLasCitas.slice();
-                cargarCitas();
-                cerrarModal();
-                alert('Cita cancelada (si la UI no cambia, recarga manualmente la página).');
-            }
-        })();
+
+                if (!encontrado) {
+                    // Fallback: forzar estado local y actualizar UI para no dejar al usuario confundido
+                    const idStr = String(citaAEliminar);
+                    let citaLocal = todasLasCitas.find(c => String(c.id) === idStr) || citas.find(c => String(c.id) === idStr);
+                    if (citaLocal) {
+                        citaLocal.estado = 'Cancelada';
+                    }
+                    citas = todasLasCitas.slice();
+                    cargarCitas();
+                    cerrarModal();
+                    // Ofrecer al admin abrir la URL de eliminación para inspección/reintento
+                    if (confirm('No se detectó confirmación desde el servidor. ¿Deseas abrir la URL de eliminación para ver la respuesta del servidor y reintentar?')) {
+                        window.open(deletionUrl, '_blank');
+                    } else {
+                        alert('Cita marcada como cancelada en la UI. Si el servidor no la canceló, revisa los logs en Apps Script o prueba con un id diferente.');
+                    }
+                }
+            })();
         }
 
         function filtrarCitas() {
