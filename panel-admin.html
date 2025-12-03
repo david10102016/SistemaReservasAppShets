@@ -710,16 +710,8 @@
         async function confirmarEliminacion() {
         if (!citaAEliminar) return;
         
-        // 1. WhatsApp primero
-        if (citaData && citaData.telefono) {
-            enviarWhatsAppCliente(
-            citaData.telefono, 
-            citaData.nombre, 
-            citaData.fecha, 
-            citaData.hora, 
-            'Cancelada'
-            );
-        }
+        // Nota: ya no enviamos WhatsApp aquí (evita duplicados). Se enviará
+        // únicamente cuando el backend confirme la cancelación.
         
         // 2. Cancelar con método que SÍ actualice
         try {
@@ -753,6 +745,18 @@
                             encontrado = true;
                             // Asegurar estado correcto en front
                             c.estado = 'Cancelada';
+                            // Enviar WhatsApp sólo después de confirmar que el backend marcó la cita como cancelada
+                            try {
+                                const tel = c.telefono || (citaData && citaData.telefono);
+                                const nombre = c.nombre || (citaData && citaData.nombre);
+                                const fecha = c.fecha || (citaData && citaData.fecha);
+                                const hora = c.hora || (citaData && citaData.hora);
+                                if (tel) {
+                                    enviarWhatsAppCliente(tel, nombre, fecha, hora, 'Cancelada');
+                                }
+                            } catch (e) {
+                                console.warn('No se pudo enviar WhatsApp tras confirmación:', e);
+                            }
                             cargarCitas();
                             actualizarEstadisticas();
                             cerrarModal();
