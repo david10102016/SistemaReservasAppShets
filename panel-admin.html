@@ -223,6 +223,11 @@
             color: #065f46;
         }
 
+        .status.Cancelada {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
         .actions {
             display: flex;
             gap: 8px;
@@ -246,6 +251,14 @@
         .btn-whatsapp:hover {
             background: #1da851;
             transform: translateY(-2px);
+        }
+
+        .btn-whatsapp.cancel {
+            background: #ef4444;
+        }
+
+        .btn-whatsapp.cancel:hover {
+            background: #dc2626;
         }
 
         .btn-delete {
@@ -455,6 +468,7 @@
 
         let usuarioActual = null;
         let citaAEliminar = null;
+        let citaData = null;
         let citas = [];
         let todasLasCitas = [];
 
@@ -580,12 +594,16 @@
                     <td><span class="status ${cita.estado || 'Confirmada'}">${cita.estado || 'Confirmada'}</span></td>
                     <td>
                         <div class="actions">
-                            <button class="btn-action btn-whatsapp" onclick="abrirWhatsApp('${cita.telefono || ''}', '${cita.nombre || ''}', '${cita.fecha || ''}', '${cita.hora || ''}')">
-                                💬 WhatsApp
+                            <button class="btn-action ${cita.estado === 'Cancelada' ? 'btn-whatsapp cancel' : 'btn-whatsapp'}" 
+                                    onclick="enviarWhatsAppCliente('${cita.telefono || ''}', '${cita.nombre || ''}', '${cita.fecha || ''}', '${cita.hora || ''}', '${cita.estado || 'Confirmada'}')">
+                                ${cita.estado === 'Cancelada' ? '📱 Notificar' : '💬 WhatsApp'}
                             </button>
-                            <button class="btn-action btn-delete" onclick="abrirModalEliminar(${cita.id || 0}, '${cita.nombre || ''}', '${cita.fecha || ''}')">
+                            ${cita.estado !== 'Cancelada' ? `
+                            <button class="btn-action btn-delete" 
+                                    onclick="abrirModalEliminar(${cita.id || 0}, '${cita.nombre || ''}', '${cita.fecha || ''}', '${cita.telefono || ''}', '${cita.hora || ''}')">
                                 🗑️
                             </button>
+                            ` : ''}
                         </div>
                     </td>
                 </tr>
@@ -643,7 +661,7 @@
             return hora;
         }
 
-        function abrirWhatsApp(telefono, nombre, fecha, hora) {
+        function enviarWhatsAppCliente(telefono, nombre, fecha, hora, estado) {
             if (!telefono) {
                 alert('No hay teléfono registrado para este cliente');
                 return;
@@ -651,13 +669,23 @@
             
             const numeroLimpio = telefono.replace(/\D/g, '');
             const fechaFormateada = formatearFecha(fecha);
-            const mensaje = `Hola ${nombre || 'cliente'}, te confirmamos tu cita para el ${fechaFormateada} a las ${formatearHora(hora)}. ¡Te esperamos! 💈`;
+            const horaFormateada = formatearHora(hora);
+            
+            let mensaje;
+            
+            if (estado === 'Cancelada') {
+                mensaje = `Hola ${nombre || 'cliente'}, lamentamos informarte que tu cita del ${fechaFormateada} a las ${horaFormateada} ha sido cancelada. Contáctanos para reprogramar.`;
+            } else {
+                mensaje = `Hola ${nombre || 'cliente'}, te confirmamos tu cita para el ${fechaFormateada} a las ${horaFormateada}. ¡Te esperamos! 💈`;
+            }
+            
             const url = `https://wa.me/591${numeroLimpio}?text=${encodeURIComponent(mensaje)}`;
             window.open(url, '_blank');
         }
 
-        function abrirModalEliminar(id, nombre, fecha) {
+        function abrirModalEliminar(id, nombre, fecha, telefono, hora) {
             citaAEliminar = id;
+            citaData = { nombre, fecha, telefono, hora };
             document.getElementById('deleteClientName').textContent = nombre || 'Cliente';
             document.getElementById('deleteClientDate').textContent = formatearFecha(fecha) || fecha;
             document.getElementById('deleteModal').classList.add('show');
@@ -666,33 +694,42 @@
         function cerrarModal() {
             document.getElementById('deleteModal').classList.remove('show');
             citaAEliminar = null;
+            citaData = null;
         }
 
         async function confirmarEliminacion() {
             if (!citaAEliminar) return;
             
             try {
-                const response = await fetch(SCRIPT_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        accion: 'eliminarCita',
-                        id: citaAEliminar
-                    })
-                });
+                const response = await fetch(`${SCRIPT_URL}?accion=eliminarCita&id=${citaAEliminar}`);
                 
-                if (response.ok) {
+                if (!response.ok) {
+                    throw new Error('Error en la respuesta del servidor');
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
                     await cargarCitasDesdeBackend();
                     cerrarModal();
-                    alert('Cita cancelada exitosamente');
+                    
+                    if (citaData && citaData.telefono) {
+                        enviarWhatsAppCliente(
+                            citaData.telefono, 
+                            citaData.nombre, 
+                            citaData.fecha, 
+                            citaData.hora, 
+                            'Cancelada'
+                        );
+                    }
+                    
+                    alert('Cita cancelada exitosamente. Se ha enviado notificación al cliente.');
                 } else {
-                    throw new Error('Error en la respuesta');
+                    throw new Error(result.message || 'Error al cancelar la cita');
                 }
             } catch (error) {
-                alert('Error al cancelar la cita');
-                console.error(error);
+                alert('Error al cancelar la cita: ' + error.message);
+                console.error('Error detallado:', error);
             }
         }
 
@@ -738,23 +775,25 @@
             const inicioMes = new Date();
             inicioMes.setDate(1);
 
-            const citasHoy = citas.filter(c => c.fecha === hoy).length;
+            const citasHoy = citas.filter(c => c.fecha === hoy && c.estado === 'Confirmada').length;
             const citasSemana = citas.filter(c => {
                 const fechaCita = new Date(c.fecha + 'T00:00:00');
-                return fechaCita >= inicioSemana;
+                return fechaCita >= inicioSemana && c.estado === 'Confirmada';
             }).length;
             
             const citasMes = citas.filter(c => {
                 const fechaCita = new Date(c.fecha + 'T00:00:00');
                 return fechaCita.getMonth() === inicioMes.getMonth() && 
-                       fechaCita.getFullYear() === inicioMes.getFullYear();
+                       fechaCita.getFullYear() === inicioMes.getFullYear() &&
+                       c.estado === 'Confirmada';
             }).length;
 
             const ingresosMes = citas
                 .filter(c => {
                     const fechaCita = new Date(c.fecha + 'T00:00:00');
                     return fechaCita.getMonth() === inicioMes.getMonth() && 
-                           fechaCita.getFullYear() === inicioMes.getFullYear();
+                           fechaCita.getFullYear() === inicioMes.getFullYear() &&
+                           c.estado === 'Confirmada';
                 })
                 .reduce((total, c) => total + (c.precio || 0), 0);
 
