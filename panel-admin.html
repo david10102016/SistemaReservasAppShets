@@ -722,12 +722,45 @@
             // Nota: ya no enviamos WhatsApp aquí (evita duplicados). Se enviará
             // únicamente cuando el backend confirme la cancelación.
 
-            // Construir la URL de eliminación y abrirla en nueva pestaña (workaround CORS)
+            // Construir la URL de eliminación (se usa para fallback/inspección)
             const deletionUrl = `${SCRIPT_URL}?accion=eliminarCita&id=${citaAEliminar}`;
+
+            // Intentar enviar la petición como POST JSON a doPost (mejor opción si CORS lo permite).
+            // Si falla (CORS u otro), hacemos fallback a abrir la URL en nueva pestaña (GET).
             try {
-                window.open(deletionUrl, '_blank');
-            } catch (e) {
-                // Ignorar
+                const postResp = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ accion: 'eliminarCita', id: String(citaAEliminar) })
+                });
+
+                // Si el servidor respondió JSON, procesarlo inmediatamente (evita polling innecesario)
+                if (postResp && postResp.ok) {
+                    try {
+                        const postResult = await postResp.json();
+                        if (postResult && postResult.success === false && postResult.message) {
+                            alert('Respuesta del servidor: ' + postResult.message);
+                            if (confirm('¿Deseas abrir la URL de eliminación en nueva pestaña para inspección?')) {
+                                window.open(deletionUrl, '_blank');
+                            }
+                            // No continuar con polling si el servidor rechazó la acción
+                            return;
+                        }
+                        // Si fue exitoso, seguimos al polling normal para verificar el cambio
+                    } catch (e) {
+                        // No se pudo parsear JSON, continuar con polling y/o fallback
+                        console.warn('No se pudo parsear respuesta POST:', e);
+                    }
+                }
+            } catch (err) {
+                console.warn('POST a doPost falló (se usará fallback GET):', err);
+                try {
+                    window.open(deletionUrl, '_blank');
+                } catch (e) {
+                    // Ignorar
+                }
             }
 
             // Polling: esperar hasta que el backend marque la cita como 'Cancelada'
