@@ -223,11 +223,6 @@
             color: #065f46;
         }
 
-        .status.Cancelada {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
         .actions {
             display: flex;
             gap: 8px;
@@ -251,14 +246,6 @@
         .btn-whatsapp:hover {
             background: #1da851;
             transform: translateY(-2px);
-        }
-
-        .btn-whatsapp.cancel {
-            background: #ef4444;
-        }
-
-        .btn-whatsapp.cancel:hover {
-            background: #dc2626;
         }
 
         .btn-delete {
@@ -457,17 +444,16 @@
     </div>
 
     <script>
-        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx25gSi5cuuh8Psg9uErvig6Xb-YAsVkXDyjN8onNk8fqE1eEXRfkRa7y7bsR1x81UR/exec';
-        const GOOGLE_CLIENT_ID = '75192488090-ptvidrt7qjmrqp938uq6dnglhgku2no9.apps.googleusercontent.com';        
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzbfQtjvwzXXr-TKyF-CdXv1nTKOeCMEsWbOscJcZ49it3jqlKp9lLCapeUHaWbG-Wx/exec';
+        const GOOGLE_CLIENT_ID = '75192488090-ptvidrt7qjmrqp938uq6dnglhgku2no9.apps.googleusercontent.com';
+        
         const EMAILS_AUTORIZADOS = [
             'creativo777si@gmail.com',
-            'lucinda.lupati777@gmail.com',
             'empleado@gmail.com'
         ];
 
         let usuarioActual = null;
         let citaAEliminar = null;
-        let citaData = null;
         let citas = [];
         let todasLasCitas = [];
 
@@ -501,17 +487,12 @@
         }
 
         function parseJwt(token) {
-            try {
-                const base64Url = token.split('.')[1];
-                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-                const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
-                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-                }).join(''));
-                return JSON.parse(jsonPayload);
-            } catch (error) {
-                console.error('Error parsing JWT:', error);
-                return { email: '' };
-            }
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+            return JSON.parse(jsonPayload);
         }
 
         async function mostrarDashboard() {
@@ -532,20 +513,14 @@
 
         async function cargarCitasDesdeBackend() {
             try {
-                const result = await obtenerCitas();
-
-                if (result && result.success && result.citas) {
+                const response = await fetch(SCRIPT_URL + '?accion=obtenerCitas');
+                const result = await response.json();
+                
+                if (result.success && result.citas) {
                     todasLasCitas = result.citas;
                     citas = result.citas;
                     cargarCitas();
                     actualizarEstadisticas();
-                    return result;
-                } else {
-                    if (result && result.success === false && result.message) {
-                        console.warn('Error del servidor:', result.message);
-                    }
-                    document.getElementById('noData').style.display = 'block';
-                    return result;
                 }
             } catch (error) {
                 console.error('Error cargando citas:', error);
@@ -553,33 +528,20 @@
             }
         }
 
-        async function obtenerCitas() {
-            try {
-                const response = await fetch(SCRIPT_URL + '?action=obtenerCitas');
-                const result = await response.json();
-                return result;
-            } catch (err) {
-                console.warn('obtenerCitas error:', err);
-                return { success: false, message: 'Error al conectar con backend' };
-            }
-        }
-
         async function cargarBarberosEnFiltro() {
             try {
-                const response = await fetch(SCRIPT_URL + '?action=obtenerBarberos');
+                const response = await fetch(SCRIPT_URL + '?accion=obtenerBarberos');
                 const barberos = await response.json();
                 
                 const selectBarbero = document.getElementById('filterBarbero');
                 selectBarbero.innerHTML = '<option value="">Todos</option>';
                 
-                if (barberos && barberos.length > 0) {
-                    barberos.forEach(b => {
-                        const option = document.createElement('option');
-                        option.value = b.nombre || b;
-                        option.textContent = b.nombre || b;
-                        selectBarbero.appendChild(option);
-                    });
-                }
+                barberos.forEach(b => {
+                    const option = document.createElement('option');
+                    option.value = b.nombre;
+                    option.textContent = b.nombre;
+                    selectBarbero.appendChild(option);
+                });
             } catch (error) {
                 console.error('Error cargando barberos:', error);
             }
@@ -589,7 +551,7 @@
             const tbody = document.getElementById('appointmentsBody');
             const citasAMostrar = citasFiltradas || citas;
             
-            if (!citasAMostrar || citasAMostrar.length === 0) {
+            if (citasAMostrar.length === 0) {
                 tbody.innerHTML = '';
                 document.getElementById('noData').style.display = 'block';
                 return;
@@ -600,24 +562,20 @@
             tbody.innerHTML = citasAMostrar.map(cita => `
                 <tr>
                     <td>${formatearFecha(cita.fecha)}</td>
-                    <td><strong>${formatearHora(cita.hora)}</strong></td>
-                    <td>${cita.nombre || ''}</td>
-                    <td>${cita.telefono || ''}</td>
-                    <td>${cita.servicio || ''}</td>
-                    <td>${cita.barbero || ''}</td>
-                    <td><span class="status ${cita.estado || 'Confirmada'}">${cita.estado || 'Confirmada'}</span></td>
+                    <td><strong>${cita.hora}</strong></td>
+                    <td>${cita.nombre}</td>
+                    <td>${cita.telefono}</td>
+                    <td>${cita.servicio}</td>
+                    <td>${cita.barbero}</td>
+                    <td><span class="status ${cita.estado}">${cita.estado}</span></td>
                     <td>
                         <div class="actions">
-                            <button class="btn-action ${cita.estado === 'Cancelada' ? 'btn-whatsapp cancel' : 'btn-whatsapp'}" 
-                                    onclick="enviarWhatsAppCliente('${cita.telefono || ''}', '${cita.nombre || ''}', '${cita.fecha || ''}', '${cita.hora || ''}', '${cita.estado || 'Confirmada'}')">
-                                ${cita.estado === 'Cancelada' ? '📱 Notificar' : '💬 WhatsApp'}
+                            <button class="btn-action btn-whatsapp" onclick="abrirWhatsApp('${cita.telefono}', '${cita.nombre}', '${cita.fecha}', '${cita.hora}')">
+                                💬 WhatsApp
                             </button>
-                            ${cita.estado !== 'Cancelada' ? `
-                            <button class="btn-action btn-delete" 
-                                    onclick="abrirModalEliminar(${cita.id || 0}, '${cita.nombre || ''}', '${cita.fecha || ''}', '${cita.telefono || ''}', '${cita.hora || ''}')">
+                            <button class="btn-action btn-delete" onclick="abrirModalEliminar(${cita.id}, '${cita.nombre}', '${cita.fecha}')">
                                 🗑️
                             </button>
-                            ` : ''}
                         </div>
                     </td>
                 </tr>
@@ -625,168 +583,58 @@
         }
 
         function formatearFecha(fecha) {
-            if (!fecha) return '';
-            
-            try {
-                let fechaObj;
-                
-                if (fecha instanceof Date) {
-                    fechaObj = fecha;
-                } else if (typeof fecha === 'string' && fecha.includes('T')) {
-                    fechaObj = new Date(fecha);
-                } else if (typeof fecha === 'string' && fecha.includes('-')) {
-                    fechaObj = new Date(fecha + 'T00:00:00');
-                } else {
-                    fechaObj = new Date(fecha);
-                }
-                
-                if (isNaN(fechaObj.getTime())) {
-                    return fecha;
-                }
-                
-                return fechaObj.toLocaleDateString('es-BO', {
-                    weekday: 'short',
-                    day: 'numeric',
-                    month: 'short'
-                });
-                
-            } catch (error) {
-                console.error('Error formateando fecha:', fecha, error);
-                return String(fecha);
-            }
+            const f = new Date(fecha + 'T00:00:00');
+            return f.toLocaleDateString('es-BO', { 
+                weekday: 'short', 
+                day: 'numeric', 
+                month: 'short' 
+            });
         }
 
-        function formatearHora(hora) {
-            if (!hora) return '';
-            
-            if (hora.includes('T') && hora.includes('Z')) {
-                try {
-                    const fecha = new Date(hora);
-                    return fecha.toLocaleTimeString('es-BO', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: false
-                    });
-                } catch (e) {
-                    return hora;
-                }
-            }
-            
-            return hora;
-        }
-
-        function enviarWhatsAppCliente(telefono, nombre, fecha, hora, estado) {
-            if (!telefono) {
-                alert('No hay teléfono registrado para este cliente');
-                return;
-            }
-            
-            const numeroLimpio = telefono.replace(/\D/g, '');
-            const fechaFormateada = formatearFecha(fecha);
-            const horaFormateada = formatearHora(hora);
-            
-            let mensaje;
-            
-            if (estado === 'Cancelada') {
-                mensaje = `Hola ${nombre || 'cliente'}, lamentamos informarte que tu cita del ${fechaFormateada} a las ${horaFormateada} ha sido cancelada. Contáctanos para reprogramar.`;
-            } else {
-                mensaje = `Hola ${nombre || 'cliente'}, te confirmamos tu cita para el ${fechaFormateada} a las ${horaFormateada}. ¡Te esperamos! 💈`;
-            }
-            
+        function abrirWhatsApp(telefono, nombre, fecha, hora) {
+            const numeroLimpio = String(telefono).replace(/\D/g, '');
+            const mensaje = `Hola ${nombre}, te confirmamos tu cita para el ${formatearFecha(fecha)} a las ${hora}. ¡Te esperamos! 💈`;
             const url = `https://wa.me/591${numeroLimpio}?text=${encodeURIComponent(mensaje)}`;
             window.open(url, '_blank');
         }
 
-        function abrirModalEliminar(id, nombre, fecha, telefono, hora) {
+        function abrirModalEliminar(id, nombre, fecha) {
             citaAEliminar = id;
-            citaData = { nombre, fecha, telefono, hora };
-            document.getElementById('deleteClientName').textContent = nombre || 'Cliente';
-            document.getElementById('deleteClientDate').textContent = formatearFecha(fecha) || fecha;
+            document.getElementById('deleteClientName').textContent = nombre;
+            document.getElementById('deleteClientDate').textContent = formatearFecha(fecha);
             document.getElementById('deleteModal').classList.add('show');
         }
 
         function cerrarModal() {
             document.getElementById('deleteModal').classList.remove('show');
             citaAEliminar = null;
-            citaData = null;
         }
 
         async function confirmarEliminacion() {
-            if (!citaAEliminar) return;
-
-            // ✅ USA 'action' EN LUGAR DE 'accion'
-            const deletionUrl = `${SCRIPT_URL}?action=eliminarCita&id=${citaAEliminar}`;
-
-            console.log('URL de eliminación:', deletionUrl);
-
-            try {
-                const response = await fetch(deletionUrl);
-                const result = await response.json();
-                
-                console.log('Respuesta de eliminación:', JSON.stringify(result));
-                
-                if (result.success) {
-                    await pollCancelacion();
-                } else {
-                    alert('Error: ' + (result.message || 'No se pudo cancelar'));
-                    cerrarModal();
-                }
-            } catch (err) {
-                console.warn('Error al cancelar:', err);
-                window.open(deletionUrl, '_blank');
-                setTimeout(() => pollCancelacion(), 2000);
-            }
-        }
-
-        async function pollCancelacion() {
-            const maxAttempts = 8;
-            const intervalMs = 1500;
-            let attempt = 0;
-            let encontrado = false;
-
-            while (attempt < maxAttempts && !encontrado) {
+            if (citaAEliminar) {
                 try {
-                    if (attempt > 0) await new Promise(r => setTimeout(r, intervalMs));
-
-                    const result = await obtenerCitas();
-
-                    if (result && result.success && result.citas) {
-                        todasLasCitas = result.citas;
-                        citas = todasLasCitas.slice();
-                        
-                        const idStr = String(citaAEliminar);
-                        const c = todasLasCitas.find(x => String(x.id) === idStr);
-                        
-                        if (c && String(c.estado).toLowerCase() === 'cancelada') {
-                            encontrado = true;
-                            c.estado = 'Cancelada';
-                            
-                            const tel = c.telefono || (citaData && citaData.telefono);
-                            const nombre = c.nombre || (citaData && citaData.nombre);
-                            const fecha = c.fecha || (citaData && citaData.fecha);
-                            const hora = c.hora || (citaData && citaData.hora);
-                            
-                            if (tel) {
-                                enviarWhatsAppCliente(tel, nombre, fecha, hora, 'Cancelada');
-                            }
-                            
-                            cargarCitas();
-                            actualizarEstadisticas();
-                            cerrarModal();
-                            alert('✅ Cita cancelada correctamente');
-                            break;
-                        }
-                    }
-                } catch (err) {
-                    console.warn('Error durante polling:', err);
+                    // Enviar petición para eliminar
+                    await fetch(SCRIPT_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        body: JSON.stringify({
+                            accion: 'eliminarCita',
+                            id: citaAEliminar
+                        })
+                    });
+                    
+                    // Esperar un momento para que se procese
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    // Recargar las citas desde el backend
+                    await cargarCitasDesdeBackend();
+                    
+                    cerrarModal();
+                    alert('Cita cancelada exitosamente');
+                } catch (error) {
+                    alert('Error al cancelar la cita');
+                    console.error(error);
                 }
-                attempt++;
-            }
-
-            if (!encontrado) {
-                alert('La cita fue procesada. Recarga la página para ver los cambios.');
-                cerrarModal();
-                setTimeout(() => location.reload(), 1000);
             }
         }
 
@@ -818,39 +666,23 @@
         }
 
         function actualizarEstadisticas() {
-            if (!citas || citas.length === 0) {
-                document.getElementById('citasHoy').textContent = 0;
-                document.getElementById('citasSemana').textContent = 0;
-                document.getElementById('citasMes').textContent = 0;
-                document.getElementById('ingresosMes').textContent = 'Bs 0';
-                return;
-            }
-
             const hoy = new Date().toISOString().split('T')[0];
             const inicioSemana = new Date();
             inicioSemana.setDate(inicioSemana.getDate() - inicioSemana.getDay());
             const inicioMes = new Date();
             inicioMes.setDate(1);
 
-            const citasHoy = citas.filter(c => c.fecha === hoy && c.estado === 'Confirmada').length;
-            const citasSemana = citas.filter(c => {
-                const fechaCita = new Date(c.fecha + 'T00:00:00');
-                return fechaCita >= inicioSemana && c.estado === 'Confirmada';
-            }).length;
-            
+            const citasHoy = citas.filter(c => c.fecha === hoy).length;
+            const citasSemana = citas.filter(c => new Date(c.fecha + 'T00:00:00') >= inicioSemana).length;
             const citasMes = citas.filter(c => {
                 const fechaCita = new Date(c.fecha + 'T00:00:00');
-                return fechaCita.getMonth() === inicioMes.getMonth() && 
-                       fechaCita.getFullYear() === inicioMes.getFullYear() &&
-                       c.estado === 'Confirmada';
+                return fechaCita.getMonth() === inicioMes.getMonth();
             }).length;
 
             const ingresosMes = citas
                 .filter(c => {
                     const fechaCita = new Date(c.fecha + 'T00:00:00');
-                    return fechaCita.getMonth() === inicioMes.getMonth() && 
-                           fechaCita.getFullYear() === inicioMes.getFullYear() &&
-                           c.estado === 'Confirmada';
+                    return fechaCita.getMonth() === inicioMes.getMonth();
                 })
                 .reduce((total, c) => total + (c.precio || 0), 0);
 
