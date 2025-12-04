@@ -556,7 +556,7 @@
 
         async function obtenerCitas() {
             try {
-                const response = await fetch(SCRIPT_URL + '?accion=obtenerCitas');
+                const response = await fetch(SCRIPT_URL + '?action=obtenerCitas');
                 const result = await response.json();
                 return result;
             } catch (err) {
@@ -567,7 +567,7 @@
 
         async function cargarBarberosEnFiltro() {
             try {
-                const response = await fetch(SCRIPT_URL + '?accion=obtenerBarberos');
+                const response = await fetch(SCRIPT_URL + '?action=obtenerBarberos');
                 const barberos = await response.json();
                 
                 const selectBarbero = document.getElementById('filterBarbero');
@@ -712,21 +712,21 @@
             citaData = null;
         }
 
-        // ✅ VERSIÓN CORREGIDA CON GET
         async function confirmarEliminacion() {
             if (!citaAEliminar) return;
 
-            const deletionUrl = `${SCRIPT_URL}?accion=eliminarCita&id=${citaAEliminar}`;
+            // ✅ USA 'action' EN LUGAR DE 'accion'
+            const deletionUrl = `${SCRIPT_URL}?action=eliminarCita&id=${citaAEliminar}`;
+
+            console.log('URL de eliminación:', deletionUrl);
 
             try {
-                // Usar GET que funciona mejor con Apps Script
                 const response = await fetch(deletionUrl);
                 const result = await response.json();
                 
-                console.log('Respuesta de eliminación:', result);
+                console.log('Respuesta de eliminación:', JSON.stringify(result));
                 
                 if (result.success) {
-                    // Hacer polling para verificar el cambio
                     await pollCancelacion();
                 } else {
                     alert('Error: ' + (result.message || 'No se pudo cancelar'));
@@ -762,7 +762,6 @@
                             encontrado = true;
                             c.estado = 'Cancelada';
                             
-                            // Enviar WhatsApp después de confirmar
                             const tel = c.telefono || (citaData && citaData.telefono);
                             const nombre = c.nombre || (citaData && citaData.nombre);
                             const fecha = c.fecha || (citaData && citaData.fecha);
