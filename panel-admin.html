@@ -444,7 +444,7 @@
     </div>
 
     <script>
-        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzbfQtjvwzXXr-TKyF-CdXv1nTKOeCMEsWbOscJcZ49it3jqlKp9lLCapeUHaWbG-Wx/exec';
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzdDlC8aBPoh6q6nv_eV_g97H3K88Ll0--pvAh7G0OSgy-0BRC9lINsLxVmJdIa4g/exec';
         const GOOGLE_CLIENT_ID = '75192488090-ptvidrt7qjmrqp938uq6dnglhgku2no9.apps.googleusercontent.com';
         
         const EMAILS_AUTORIZADOS = [
@@ -458,6 +458,14 @@
         let todasLasCitas = [];
 
         window.onload = function() {
+            const usuarioGuardado = sessionStorage.getItem('userLoggedIn');
+            
+            if (usuarioGuardado && EMAILS_AUTORIZADOS.includes(usuarioGuardado)) {
+                usuarioActual = usuarioGuardado;
+                mostrarDashboard();
+                return;
+            }
+            
             google.accounts.id.initialize({
                 client_id: GOOGLE_CLIENT_ID,
                 callback: manejarCredencial
@@ -480,6 +488,7 @@
 
             if (EMAILS_AUTORIZADOS.includes(email)) {
                 usuarioActual = email;
+                sessionStorage.setItem('userLoggedIn', email);
                 mostrarDashboard();
             } else {
                 alert('❌ Acceso denegado.\n\nEste email no tiene permiso para acceder al panel de administración.\n\nContacta al administrador del sistema.');
@@ -506,6 +515,7 @@
 
         function cerrarSesion() {
             google.accounts.id.disableAutoSelect();
+            sessionStorage.removeItem('userLoggedIn');
             usuarioActual = null;
             document.getElementById('loginScreen').style.display = 'flex';
             document.getElementById('dashboard').style.display = 'none';
@@ -613,7 +623,6 @@
         async function confirmarEliminacion() {
             if (citaAEliminar) {
                 try {
-                    // Enviar petición para eliminar
                     await fetch(SCRIPT_URL, {
                         method: 'POST',
                         mode: 'no-cors',
@@ -623,10 +632,7 @@
                         })
                     });
                     
-                    // Esperar un momento para que se procese
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    
-                    // Recargar las citas desde el backend
+                    await new Promise(resolve => setTimeout(resolve, 1500));
                     await cargarCitasDesdeBackend();
                     
                     cerrarModal();
